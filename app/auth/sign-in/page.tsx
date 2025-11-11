@@ -55,7 +55,7 @@ export default function SignInPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-[hsl(var(--background))]">
+    <div className="flex-1 flex flex-col items-center justify-center p-6 bg-[hsl(var(--background))]">
       <form onSubmit={onSubmit} className="w-full max-w-sm space-y-4 border border-zinc-300 dark:border-zinc-700 rounded-lg p-6 bg-white dark:bg-zinc-800 shadow-sm">
         <h1 className="text-2xl font-semibold text-zinc-900 dark:text-white">Sign in</h1>
         {error && <p className="text-red-600 dark:text-red-400 text-sm">{error}</p>}

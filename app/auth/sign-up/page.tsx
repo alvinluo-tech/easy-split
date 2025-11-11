@@ -76,7 +76,7 @@ export default function SignUpPage() {
 
   if (verificationSent) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-[hsl(var(--background))]">
+      <div className="flex-1 flex flex-col items-center justify-center p-6 bg-[hsl(var(--background))]">
         <div className="w-full max-w-sm space-y-4 border border-zinc-300 dark:border-zinc-700 rounded-lg p-6 bg-white dark:bg-zinc-800 shadow-sm">
           <h1 className="text-2xl font-semibold text-zinc-900 dark:text-white">Verify your email</h1>
           <div className="border border-green-300 dark:border-green-700 rounded p-4 bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-300">
@@ -100,7 +100,7 @@ export default function SignUpPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-[hsl(var(--background))]">
+    <div className="flex-1 flex flex-col items-center justify-center p-6 bg-[hsl(var(--background))]">
       <form onSubmit={onSubmit} className="w-full max-w-sm space-y-4 border border-zinc-300 dark:border-zinc-700 rounded-lg p-6 bg-white dark:bg-zinc-800 shadow-sm">
         <h1 className="text-2xl font-semibold text-zinc-900 dark:text-white">Sign up</h1>
         {error && <p className="text-red-600 dark:text-red-400 text-sm">{error}</p>}
