@@ -1,0 +1,287 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { auth, db, storage } from '@/lib/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
+import {
+  collection,
+  doc,
+  onSnapshot,
+  query,
+  getDoc,
+  addDoc,
+  setDoc,
+  deleteDoc,
+  writeBatch,
+} from 'firebase/firestore';
+import { ref, uploadBytes } from 'firebase/storage';
+import { useUserProfiles, getDisplayName } from '@/lib/useUserProfiles';
+
+export default function CommunityPage() {
+  const { communityId } = useParams() as { communityId: string };
+  const router = useRouter();
+  const [user, setUser] = useState<any>(null);
+  const [community, setCommunity] = useState<any>(null);
+  const [members, setMembers] = useState<any[]>([]);
+  const [loadingUpload, setLoadingUpload] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [bills, setBills] = useState<any[]>([]);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  
+  // Fetch user profiles for all members
+  const memberUids = members.map((m) => m.uid);
+  const userProfiles = useUserProfiles(memberUids);
+  
+  // Check if current user is owner
+  const isOwner = user && community && community.ownerId === user.uid;
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, async (u) => {
+      if (!u) router.push('/auth/sign-in');
+      setUser(u);
+    });
+    return () => unsub();
+  }, [router]);
+
+  useEffect(() => {
+    if (!communityId) return;
+    const cRef = doc(db, 'communities', communityId);
+    getDoc(cRef).then((snap) => setCommunity(snap.data()));
+    const mCol = collection(db, 'communities', communityId, 'members');
+    const unsubMembers = onSnapshot(mCol, (snap) => {
+      setMembers(snap.docs.map((d) => d.data()));
+    });
+    const billsCol = collection(db, 'communities', communityId, 'bills');
+    const unsubBills = onSnapshot(billsCol, (snap) => {
+      setBills(snap.docs.map((d) => d.data()).sort((a, b) => b.createdAt - a.createdAt));
+    });
+    return () => {
+      unsubMembers();
+      unsubBills();
+    };
+  }, [communityId]);
+
+  const removeMember = async (memberUid: string) => {
+    if (!user || !communityId) return;
+    
+    // Prevent owner from removing themselves
+    if (memberUid === community?.ownerId) {
+      setError('Owner cannot leave the community. Transfer ownership first or delete the community.');
+      return;
+    }
+    
+    // Check permissions: only owner can kick others, anyone can leave themselves
+    if (memberUid !== user.uid && !isOwner) {
+      setError('Only the owner can remove other members.');
+      return;
+    }
+    
+    const displayName = getDisplayName(memberUid, userProfiles);
+    const confirmMsg = memberUid === user.uid 
+      ? `Are you sure you want to leave this community?`
+      : `Are you sure you want to remove ${displayName} from this community?`;
+    
+    if (!confirm(confirmMsg)) return;
+    
+    setActionLoading(memberUid);
+    setError(null);
+    
+    try {
+      const batch = writeBatch(db);
+      
+      // Delete from communities/{id}/members/{uid}
+      const memberRef = doc(db, 'communities', communityId, 'members', memberUid);
+      batch.delete(memberRef);
+      
+      // Delete from users/{uid}/memberships/{communityId}
+      const membershipRef = doc(db, 'users', memberUid, 'memberships', communityId);
+      batch.delete(membershipRef);
+      
+      await batch.commit();
+      
+      // If user left themselves, redirect to dashboard
+      if (memberUid === user.uid) {
+        router.push('/dashboard');
+      }
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const onUploadReceipt = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    setError(null);
+    setLoadingUpload(true);
+    try {
+      // Upload to Firebase Storage
+      const storagePath = `receipts/${communityId}/${Date.now()}-${file.name}`;
+      const storageRef = ref(storage, storagePath);
+      await uploadBytes(storageRef, file);
+      // Call OCR API
+      const res = await fetch('/api/ocr', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          communityId,
+          storagePath,
+          createdBy: user.uid,
+          exchangeRateGBPToCNY: 9,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'OCR failed');
+      console.log('OCR API Response:', data);
+      if (data.debug) {
+        alert('OCR Debug Info (check console for details):\n' + 
+          `Documents: ${data.debug.documentsCount}\n` +
+          `Fields: ${data.debug.firstDocFields?.join(', ')}\n` +
+          `Items parsed: ${data.debug.parsedItems?.length}`
+        );
+      }
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoadingUpload(false);
+      e.target.value = '';
+    }
+  };
+
+  return (
+    <div className="p-6 space-y-8 max-w-4xl mx-auto">
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-semibold">Community</h1>
+        <a href="/dashboard" className="underline text-sm">Back</a>
+      </div>
+      {community && (
+        <div className="border rounded p-4 space-y-2">
+          <div className="flex items-center gap-2">
+            {isOwner ? (
+              <CommunityNameEditor communityId={communityId} currentName={community.name} />
+            ) : (
+              <div className="font-medium text-lg">{community.name}</div>
+            )}
+          </div>
+          <div className="text-xs text-zinc-600">Invite code: {community.inviteCode}</div>
+        </div>
+      )}
+
+      <section className="space-y-3">
+        <div className="flex justify-between items-center">
+          <h2 className="text-lg font-medium">Members ({members.length})</h2>
+          {user && !isOwner && (
+            <button
+              onClick={() => removeMember(user.uid)}
+              disabled={actionLoading === user.uid}
+              className="text-sm text-red-600 hover:text-red-700 underline"
+            >
+              {actionLoading === user.uid ? 'Leaving...' : 'Leave Community'}
+            </button>
+          )}
+        </div>
+        <ul className="grid sm:grid-cols-2 gap-2">
+          {members.map((m) => (
+            <li key={m.uid} className="border p-3 rounded">
+              <div className="flex justify-between items-start">
+                <div className="flex-1">
+                  <div className="font-medium text-sm flex items-center gap-2">
+                    {getDisplayName(m.uid, userProfiles)}
+                    {m.uid === community?.ownerId && (
+                      <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-semibold">
+                        👑 Owner
+                      </span>
+                    )}
+                    {m.uid === user?.uid && m.uid !== community?.ownerId && (
+                      <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">You</span>
+                    )}
+                  </div>
+                  <div className="text-xs text-zinc-500 mt-1">{m.uid}</div>
+                </div>
+                {isOwner && m.uid !== community?.ownerId && (
+                  <button
+                    onClick={() => removeMember(m.uid)}
+                    disabled={actionLoading === m.uid}
+                    className="text-xs text-red-600 hover:text-red-700 underline ml-2"
+                  >
+                    {actionLoading === m.uid ? 'Removing...' : 'Remove'}
+                  </button>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-lg font-medium">Upload receipt</h2>
+        {error && <p className="text-red-600 text-sm">{error}</p>}
+        <input type="file" accept="image/*" onChange={onUploadReceipt} />
+        {loadingUpload && <p className="text-sm">Processing…</p>}
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-lg font-medium">Bills</h2>
+        <ul className="space-y-3">
+          {bills.map((b) => (
+            <li key={b.id} className="border rounded p-3">
+              <div className="flex justify-between">
+                <div>
+                  <div className="font-medium">{b.billName || `Bill #${b.id.slice(0, 6)}`}</div>
+                  <div className="text-xs text-zinc-500">Total: {b.total.toFixed(2)} GBP</div>
+                </div>
+                <a className="underline text-sm" href={`/bills/${b.id}?community=${communityId}`}>Open</a>
+              </div>
+            </li>
+          ))}
+          {bills.length === 0 && <li className="text-sm text-zinc-500">No bills yet.</li>}
+        </ul>
+      </section>
+    </div>
+  );
+}
+
+function CommunityNameEditor({ communityId, currentName }: { communityId: string; currentName: string }) {
+  const [name, setName] = useState(currentName);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+
+  useEffect(() => setName(currentName), [currentName]);
+
+  const save = async () => {
+    if (!name.trim() || name.trim() === currentName) return;
+    setSaving(true);
+    setMessage(null);
+    try {
+      const ref = doc(db, 'communities', communityId);
+      await setDoc(ref, { name: name.trim() }, { merge: true });
+      setMessage('Saved');
+      setTimeout(() => setMessage(null), 1500);
+    } catch (e: any) {
+      setMessage(e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      <input
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        className="border rounded px-2 py-1 text-sm"
+        maxLength={60}
+      />
+      <button
+        onClick={save}
+        disabled={saving || !name.trim() || name.trim() === currentName}
+        className="text-xs px-2 py-1 rounded bg-black text-white disabled:opacity-40"
+      >
+        {saving ? 'Saving…' : 'Save'}
+      </button>
+      {message && <span className="text-xs text-zinc-500">{message}</span>}
+    </div>
+  );
+}

@@ -30,8 +30,9 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files (keep examples versioned)
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -39,3 +40,29 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+Thumbs.db
+
+# ESLint
+.eslintcache
+
+# Firebase local
+.firebase/
+firebase-debug.log
+
+# Next.js cache (explicit)
+.next/cache
+
+# Service account & secrets (safety net)
+serviceAccount*.json
+*.secret.*
+*.key
+
+# Firebase rules (requested to keep out of VCS)
+firestore.rules
+storage.rules
