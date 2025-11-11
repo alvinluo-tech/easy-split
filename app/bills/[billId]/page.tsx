@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
-import { auth, db } from '@/lib/firebase';
+import { auth, db, storage } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
   arrayRemove,
@@ -15,6 +15,7 @@ import {
   deleteDoc,
 } from 'firebase/firestore';
 import { formatBoth, gbp } from '@/lib/format';
+import { ref as storageRef, getDownloadURL } from 'firebase/storage';
 import { useUserProfiles, getDisplayName } from '@/lib/useUserProfiles';
 
 export default function BillPage() {
@@ -32,6 +33,7 @@ export default function BillPage() {
   const [savingName, setSavingName] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [membersInitialized, setMembersInitialized] = useState(false);
+  const [receiptUrl, setReceiptUrl] = useState<string | null>(null);
   
   // Fetch user profiles for all members, item claimers, and bill creator
   const allUids = [
@@ -55,12 +57,25 @@ export default function BillPage() {
     if (!communityId || !billId) return;
     const billRef = doc(db, 'communities', communityId, 'bills', billId);
     const unsubBill = onSnapshot(billRef, (snap) => {
-      const data = snap.data();
-      setBill(data);
-      if (data?.billName) setBillName(data.billName);
+      const data = snap.data() as any;
+      if (!data) return;
+      // Attach id from doc path if not present
+      const withId = { id: data.id || snap.id, ...data };
+      setBill(withId);
+      if (withId.billName) setBillName(withId.billName);
+      // Receipt URL: prefer stored receiptUrl; else try to resolve from storagePath
+      if (withId.receiptUrl) {
+        setReceiptUrl(withId.receiptUrl);
+      } else if (withId.storagePath) {
+        getDownloadURL(storageRef(storage, withId.storagePath))
+          .then((url) => setReceiptUrl(url))
+          .catch(() => setReceiptUrl(null));
+      } else {
+        setReceiptUrl(null);
+      }
     });
     const itemsCol = collection(db, 'communities', communityId, 'bills', billId, 'items');
-    const unsubItems = onSnapshot(itemsCol, (snap) => setItems(snap.docs.map((d) => d.data())));
+  const unsubItems = onSnapshot(itemsCol, (snap) => setItems(snap.docs.map((d) => ({ id: d.id, ...d.data() }))));
     const memCol = collection(db, 'communities', communityId, 'members');
     const unsubMembers = onSnapshot(memCol, (snap) => {
       setMembers(snap.docs.map((d) => d.data()));
@@ -166,43 +181,55 @@ export default function BillPage() {
       </div>
 
       {bill && (
-        <div className="border border-zinc-300 dark:border-zinc-700 rounded p-3 space-y-2 bg-zinc-50 dark:bg-zinc-800">
-          <div className="text-sm text-black dark:text-white">Bill ID: {bill.id}</div>
-          <div className="text-sm text-black dark:text-white">Created by: {getDisplayName(bill.createdBy, userProfiles)}</div>
-          <div className="text-sm text-black dark:text-white">Created: {new Date(bill.createdAt).toLocaleString()}</div>
-          <div className="flex items-center gap-2">
-            <label className="text-sm text-black dark:text-white">GBP→CNY rate</label>
-            <input
-              type="number"
-              step="0.0001"
-              className="border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-900 dark:text-white p-1 rounded w-28 disabled:opacity-50"
-              value={exchangeRate || 0}
-              onChange={(e) => updateRate(parseFloat(e.target.value) || 0)}
-              disabled={!isCreator}
-            />
+          <div className="border border-zinc-300 dark:border-zinc-700 rounded p-3 space-y-2 bg-zinc-50 dark:bg-zinc-800">
+            <div className="text-sm text-black dark:text-white">Bill ID: {bill.id}</div>
+            <div className="text-sm text-black dark:text-white">Created by: {getDisplayName(bill.createdBy, userProfiles)}</div>
+            <div className="text-sm text-black dark:text-white">Created: {new Date(bill.createdAt).toLocaleString()}</div>
+            {/* 原始账单图片预览 */}
+            {receiptUrl && (
+              <div className="mt-2">
+                <h3 className="text-sm font-medium text-black dark:text-white mb-1">Original Receipt</h3>
+                <div className="flex items-center gap-3">
+                  <a href={receiptUrl} target="_blank" rel="noopener noreferrer">
+                    <img src={receiptUrl} alt="Receipt" className="max-h-40 rounded border border-zinc-200 dark:border-zinc-700 shadow hover:scale-105 transition-transform cursor-pointer" />
+                  </a>
+                  <a href={receiptUrl} download className="text-xs px-3 py-1 rounded bg-blue-600 dark:bg-blue-500 text-white font-medium hover:bg-blue-700 dark:hover:bg-blue-400 transition">Download</a>
+                </div>
+              </div>
+            )}
+            <div className="flex items-center gap-2 mt-2">
+              <label className="text-sm text-black dark:text-white">GBP→CNY rate</label>
+              <input
+                type="number"
+                step="0.0001"
+                className="border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-900 dark:text-white p-1 rounded w-28 disabled:opacity-50"
+                value={exchangeRate || 0}
+                onChange={(e) => updateRate(parseFloat(e.target.value) || 0)}
+                disabled={!isCreator}
+              />
+            </div>
+            {isCreator && (
+              <button
+                className="text-xs text-red-600 dark:text-red-400 underline hover:text-red-700 dark:hover:text-red-500"
+                disabled={deleting}
+                onClick={async () => {
+                  if (!confirm('Delete this bill? This cannot be undone.')) return;
+                  setDeleting(true);
+                  try {
+                    const ref = doc(db, 'communities', communityId, 'bills', billId);
+                    await deleteDoc(ref);
+                    router.push(`/communities/${communityId}`);
+                  } catch (e: any) {
+                    setErr(e.message);
+                  } finally {
+                    setDeleting(false);
+                  }
+                }}
+              >
+                {deleting ? 'Deleting…' : 'Delete Bill'}
+              </button>
+            )}
           </div>
-          {isCreator && (
-            <button
-              className="text-xs text-red-600 dark:text-red-400 underline hover:text-red-700 dark:hover:text-red-500"
-              disabled={deleting}
-              onClick={async () => {
-                if (!confirm('Delete this bill? This cannot be undone.')) return;
-                setDeleting(true);
-                try {
-                  const ref = doc(db, 'communities', communityId, 'bills', billId);
-                  await deleteDoc(ref);
-                  router.push(`/communities/${communityId}`);
-                } catch (e: any) {
-                  setErr(e.message);
-                } finally {
-                  setDeleting(false);
-                }
-              }}
-            >
-              {deleting ? 'Deleting…' : 'Delete Bill'}
-            </button>
-          )}
-        </div>
       )}
 
       <section className="space-y-2">

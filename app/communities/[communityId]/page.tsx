@@ -8,9 +8,9 @@ import {
   collection,
   doc,
   onSnapshot,
-  addDoc,
   setDoc,
   deleteDoc,
+  updateDoc,
 } from 'firebase/firestore';
 import { ref, uploadBytes } from 'firebase/storage';
 import { useUserProfiles, getDisplayName } from '@/lib/useUserProfiles';
@@ -79,12 +79,19 @@ export default function CommunityPage() {
     if (!communityId || !authorized) return;
     const mCol = collection(db, 'communities', communityId, 'members');
     const unsubMembers = onSnapshot(mCol, (snap) => {
-      setMembers(snap.docs.map((d) => d.data()));
+      setMembers(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
       setMembersInitialized(true);
     });
     const billsCol = collection(db, 'communities', communityId, 'bills');
     const unsubBills = onSnapshot(billsCol, (snap) => {
-      setBills(snap.docs.map((d) => d.data()).sort((a, b) => b.createdAt - a.createdAt));
+      const mapped = snap.docs.map((d) => {
+        const data: any = d.data();
+        // Prefer explicit data.id if present else Firestore doc id
+        const id = data.id || d.id;
+        return { id, ...data };
+      });
+      mapped.sort((a: any, b: any) => (b.createdAt || 0) - (a.createdAt || 0));
+      setBills(mapped as any);
     });
     return () => {
       unsubMembers();
@@ -170,6 +177,9 @@ export default function CommunityPage() {
       const storagePath = `receipts/${communityId}/${Date.now()}-${file.name}`;
       const storageRef = ref(storage, storagePath);
       await uploadBytes(storageRef, file);
+      // 获取下载 URL
+      const { getDownloadURL } = await import('firebase/storage');
+      const downloadUrl = await getDownloadURL(storageRef);
       // Call OCR API
       const res = await fetch('/api/ocr', {
         method: 'POST',
@@ -183,7 +193,22 @@ export default function CommunityPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'OCR failed');
+      // 后端 OCR 路由已经创建了 bill 和 items；此处只补充 receiptUrl（如果需要）
+      const createdBillId = data.billId; // 从后端返回
+      if (createdBillId) {
+        const billDocRef = doc(db, 'communities', communityId, 'bills', createdBillId);
+        // 尝试更新（如果规则允许），否则忽略错误
+        try {
+          await updateDoc(billDocRef, { receiptUrl: downloadUrl });
+        } catch (updateErr: any) {
+          console.warn('Failed to update receiptUrl (likely rules restriction):', updateErr?.message);
+        }
+      }
       console.log('OCR API Response:', data);
+      // 跳转到新生成的账单详情，便于用户立即查看识别结果
+      if (data.billId) {
+        router.push(`/bills/${data.billId}?community=${communityId}`);
+      }
       if (data.debug) {
         alert('OCR Debug Info (check console for details):\n' + 
           `Documents: ${data.debug.documentsCount}\n` +
@@ -300,11 +325,16 @@ export default function CommunityPage() {
       <section className="space-y-3">
         <h2 className="text-lg font-medium text-zinc-900 dark:text-white">Bills</h2>
         <ul className="space-y-3">
-          {bills.map((b) => (
-            <li key={b.id} className="border border-zinc-300 dark:border-zinc-700 rounded p-3 bg-white dark:bg-zinc-800">
+          {bills.map((b: any) => (
+            <li key={b.id || b.billName} className="border border-zinc-300 dark:border-zinc-700 rounded p-3 bg-white dark:bg-zinc-800">
               <div className="flex justify-between">
                 <div>
-                  <div className="font-medium text-zinc-900 dark:text-white">{b.billName || `Bill #${b.id.slice(0, 6)}`}</div>
+                  <div className="font-medium text-zinc-900 dark:text-white flex items-center gap-2">
+                    <span>{b.billName || `Bill #${(b.id || '').slice(0, 6)}`}</span>
+                    {(b.receiptUrl || b.storagePath) && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-600">with receipt</span>
+                    )}
+                  </div>
                   <div className="text-xs text-zinc-500 dark:text-zinc-400">Total: {b.total.toFixed(2)} GBP</div>
                 </div>
                 <a className="underline text-sm text-zinc-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400" href={`/bills/${b.id}?community=${communityId}`}>Open</a>
