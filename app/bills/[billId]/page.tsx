@@ -31,6 +31,7 @@ export default function BillPage() {
   const [billName, setBillName] = useState<string>('');
   const [savingName, setSavingName] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [membersInitialized, setMembersInitialized] = useState(false);
   
   // Fetch user profiles for all members, item claimers, and bill creator
   const allUids = [
@@ -61,7 +62,10 @@ export default function BillPage() {
     const itemsCol = collection(db, 'communities', communityId, 'bills', billId, 'items');
     const unsubItems = onSnapshot(itemsCol, (snap) => setItems(snap.docs.map((d) => d.data())));
     const memCol = collection(db, 'communities', communityId, 'members');
-    const unsubMembers = onSnapshot(memCol, (snap) => setMembers(snap.docs.map((d) => d.data())));
+    const unsubMembers = onSnapshot(memCol, (snap) => {
+      setMembers(snap.docs.map((d) => d.data()));
+      setMembersInitialized(true);
+    });
     return () => {
       unsubBill();
       unsubItems();
@@ -69,8 +73,18 @@ export default function BillPage() {
     };
   }, [communityId, billId]);
 
+  // Redirect non-members away from the bill view
+  const isMember = user && members.some((m) => m.uid === user.uid);
+  useEffect(() => {
+    if (!user || !membersInitialized) return;
+    if (!isMember) {
+      router.push('/dashboard');
+    }
+  }, [user, isMember, membersInitialized, router]);
+
   const participantIds = (bill?.participants as string[]) || [];
   const exchangeRate = bill?.exchangeRateGBPToCNY || 0;
+  const isParticipant = user && participantIds.includes(user.uid);
 
   const totals = useMemo(() => {
     const privateTotals: Record<string, number> = {};
@@ -238,12 +252,18 @@ export default function BillPage() {
                   <div className="text-xs text-zinc-600 dark:text-zinc-400">{gbp.format(it.price)}</div>
                 )}
               </div>
-              <button
-                className={`px-3 py-1 rounded text-sm ${it.claimedBy ? 'bg-zinc-200 dark:bg-zinc-700 text-black dark:text-white' : 'bg-black dark:bg-white text-white dark:text-black'} hover:opacity-80`}
-                onClick={() => toggleClaim(it.id)}
-              >
-                {it.claimedBy ? `${getDisplayName(it.claimedBy, userProfiles)}` : 'Claim private'}
-              </button>
+              {isParticipant ? (
+                <button
+                  className={`px-3 py-1 rounded text-sm ${it.claimedBy ? 'bg-zinc-200 dark:bg-zinc-700 text-black dark:text-white' : 'bg-black dark:bg-white text-white dark:text-black'} hover:opacity-80`}
+                  onClick={() => toggleClaim(it.id)}
+                >
+                  {it.claimedBy ? `${getDisplayName(it.claimedBy, userProfiles)}` : 'Claim private'}
+                </button>
+              ) : (
+                <div className="px-3 py-1 text-sm text-zinc-500 dark:text-zinc-400">
+                  {it.claimedBy ? `${getDisplayName(it.claimedBy, userProfiles)}` : 'Shared'}
+                </div>
+              )}
             </li>
           ))}
         </ul>

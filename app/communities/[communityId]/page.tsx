@@ -8,12 +8,9 @@ import {
   collection,
   doc,
   onSnapshot,
-  query,
-  getDoc,
   addDoc,
   setDoc,
   deleteDoc,
-  writeBatch,
 } from 'firebase/firestore';
 import { ref, uploadBytes } from 'firebase/storage';
 import { useUserProfiles, getDisplayName } from '@/lib/useUserProfiles';
@@ -28,6 +25,7 @@ export default function CommunityPage() {
   const [error, setError] = useState<string | null>(null);
   const [bills, setBills] = useState<any[]>([]);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [membersInitialized, setMembersInitialized] = useState(false);
   
   // Fetch user profiles for all members
   const memberUids = members.map((m) => m.uid);
@@ -44,13 +42,45 @@ export default function CommunityPage() {
     return () => unsub();
   }, [router]);
 
+  // Load community doc (always readable) and lazily attach members/bills
+  const [authorized, setAuthorized] = useState(false);
   useEffect(() => {
     if (!communityId) return;
     const cRef = doc(db, 'communities', communityId);
-    getDoc(cRef).then((snap) => setCommunity(snap.data()));
+    const unsubCommunity = onSnapshot(cRef, (snap) => {
+      setCommunity(snap.data());
+    });
+    return () => {
+      unsubCommunity();
+    };
+  }, [communityId]);
+
+  // Determine authorization to read members/bills: owner OR membership exists
+  useEffect(() => {
+    if (!communityId || !user) return;
+    const cRef = doc(db, 'communities', communityId);
+    const selfMemberRef = doc(db, 'communities', communityId, 'members', user.uid);
+    // Listen to both community (for owner) and self membership
+    const unsubs: Array<() => void> = [];
+    unsubs.push(onSnapshot(cRef, (snap) => {
+      const data = snap.data() as any;
+      if (data?.ownerId === user.uid) setAuthorized(true);
+    }));
+    unsubs.push(onSnapshot(selfMemberRef, (snap) => {
+      if (snap.exists()) setAuthorized(true);
+    }, (_err) => {
+      // ignore permission errors here; we'll retry when membership is created
+    }));
+    return () => unsubs.forEach((fn) => fn());
+  }, [communityId, user]);
+
+  // Attach members/bills once authorized
+  useEffect(() => {
+    if (!communityId || !authorized) return;
     const mCol = collection(db, 'communities', communityId, 'members');
     const unsubMembers = onSnapshot(mCol, (snap) => {
       setMembers(snap.docs.map((d) => d.data()));
+      setMembersInitialized(true);
     });
     const billsCol = collection(db, 'communities', communityId, 'bills');
     const unsubBills = onSnapshot(billsCol, (snap) => {
@@ -60,7 +90,16 @@ export default function CommunityPage() {
       unsubMembers();
       unsubBills();
     };
-  }, [communityId]);
+  }, [communityId, authorized]);
+
+  // If user is no longer a member, redirect them away
+  const isMember = user && members.some((m) => m.uid === user.uid);
+  useEffect(() => {
+    if (!user || !membersInitialized) return;
+    if (!isMember) {
+      router.push('/dashboard');
+    }
+  }, [user, isMember, membersInitialized, router]);
 
   const removeMember = async (memberUid: string) => {
     if (!user || !communityId) return;
@@ -88,23 +127,30 @@ export default function CommunityPage() {
     setError(null);
     
     try {
-      const batch = writeBatch(db);
-      
-      // Delete from communities/{id}/members/{uid}
+      // Delete from communities/{id}/members/{uid} first
       const memberRef = doc(db, 'communities', communityId, 'members', memberUid);
-      batch.delete(memberRef);
+      await deleteDoc(memberRef);
       
       // Delete from users/{uid}/memberships/{communityId}
+      // Both user leaving themselves and owner kicking someone should delete this
+      // Note: If this fails due to permissions, it's okay - the dashboard guard will clean it up
       const membershipRef = doc(db, 'users', memberUid, 'memberships', communityId);
-      batch.delete(membershipRef);
-      
-      await batch.commit();
+      try {
+        await deleteDoc(membershipRef);
+      } catch (membershipErr: any) {
+        // Ignore permission errors for membership deletion - the dashboard guard will handle it
+        // Only log other unexpected errors
+        if (!membershipErr.message?.includes('permission') && !membershipErr.code?.includes('permission-denied')) {
+          console.warn('Failed to delete membership mirror (non-permission error):', membershipErr);
+        }
+      }
       
       // If user left themselves, redirect to dashboard
       if (memberUid === user.uid) {
         router.push('/dashboard');
       }
     } catch (err: any) {
+      console.error('Remove member error:', err);
       setError(err.message);
     } finally {
       setActionLoading(null);

@@ -12,6 +12,7 @@ import {
   query,
   serverTimestamp,
   setDoc,
+  deleteDoc,
   where,
 } from 'firebase/firestore';
 import Link from 'next/link';
@@ -31,6 +32,7 @@ export default function DashboardPage() {
   const [newName, setNewName] = useState('');
   const [joinCode, setJoinCode] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [membershipGuards, setMembershipGuards] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
@@ -55,6 +57,53 @@ export default function DashboardPage() {
     return () => unsub();
   }, [user]);
 
+  // Live-validate each membership by checking that communities/{id}/members/{uid} still exists
+  useEffect(() => {
+    if (!user) return;
+    const unsubs: Array<() => void> = [];
+
+    for (const m of memberships) {
+      const ref = doc(db, 'communities', m.communityId, 'members', user.uid);
+      const unsub = onSnapshot(
+        ref,
+        (snap) => {
+          setMembershipGuards((prev) => ({
+            ...prev,
+            [m.communityId]: snap.exists(),
+          }));
+        },
+        (error: any) => {
+          // If we don't have permission to read the membership doc anymore,
+          // treat it as not a member so we hide the shell immediately.
+          setMembershipGuards((prev) => ({
+            ...prev,
+            [m.communityId]: false,
+          }));
+        }
+      );
+      unsubs.push(unsub);
+    }
+
+    return () => {
+      unsubs.forEach((fn) => fn());
+    };
+  }, [user, memberships]);
+
+  // Best-effort cleanup: if the mirror membership exists but server-side membership is gone, delete the mirror
+  useEffect(() => {
+    if (!user) return;
+    const stale = memberships.filter((m) => membershipGuards[m.communityId] === false);
+    if (stale.length === 0) return;
+    stale.forEach(async (m) => {
+      try {
+        const ref = doc(db, 'users', user.uid, 'memberships', m.communityId);
+        const { deleteDoc } = await import('firebase/firestore');
+        await deleteDoc(ref);
+      } catch (_) {
+        // ignore
+      }
+    });
+  }, [user, memberships, membershipGuards]);
   const createCommunity = async () => {
     if (!user || !newName) return;
     setError(null);
@@ -120,7 +169,7 @@ export default function DashboardPage() {
       <section className="space-y-3">
         <h2 className="text-lg font-medium text-zinc-900 dark:text-white">Your communities</h2>
         <ul className="space-y-3">
-          {memberships.map((m) => (
+          {memberships.filter((m) => membershipGuards[m.communityId] !== false).map((m) => (
             <li key={m.communityId} className="flex justify-between items-center border border-zinc-300 dark:border-zinc-700 p-3 rounded bg-white dark:bg-zinc-800">
               <div>
                 <div className="font-medium text-zinc-900 dark:text-white">{m.name}</div>
