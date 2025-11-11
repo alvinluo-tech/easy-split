@@ -76,10 +76,10 @@ export default function SignUpPage() {
 
   if (verificationSent) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6">
-        <div className="w-full max-w-sm space-y-4">
-          <h1 className="text-2xl font-semibold">Verify your email</h1>
-          <div className="border rounded p-4 bg-green-50 text-green-800">
+      <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-[hsl(var(--background))]">
+        <div className="w-full max-w-sm space-y-4 border border-zinc-300 dark:border-zinc-700 rounded-lg p-6 bg-white dark:bg-zinc-800 shadow-sm">
+          <h1 className="text-2xl font-semibold text-zinc-900 dark:text-white">Verify your email</h1>
+          <div className="border border-green-300 dark:border-green-700 rounded p-4 bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-300">
             <p className="text-sm">
               A verification email has been sent to <strong>{email}</strong>.
             </p>
@@ -87,9 +87,9 @@ export default function SignUpPage() {
               Please check your inbox and click the verification link to activate your account.
             </p>
           </div>
-          <p className="text-sm text-zinc-600">
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">
             After verifying your email, you can{' '}
-            <Link href="/auth/sign-in" className="underline">
+            <Link href="/auth/sign-in" className="underline hover:text-blue-600 dark:hover:text-blue-400">
               sign in
             </Link>
             .
@@ -100,16 +100,16 @@ export default function SignUpPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6">
-      <form onSubmit={onSubmit} className="w-full max-w-sm space-y-4">
-        <h1 className="text-2xl font-semibold">Sign up</h1>
-        {error && <p className="text-red-600 text-sm">{error}</p>}
+    <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-[hsl(var(--background))]">
+      <form onSubmit={onSubmit} className="w-full max-w-sm space-y-4 border border-zinc-300 dark:border-zinc-700 rounded-lg p-6 bg-white dark:bg-zinc-800 shadow-sm">
+        <h1 className="text-2xl font-semibold text-zinc-900 dark:text-white">Sign up</h1>
+        {error && <p className="text-red-600 dark:text-red-400 text-sm">{error}</p>}
         <input
           type="text"
           placeholder="Display name"
           value={displayName}
           onChange={(e) => setDisplayName(e.target.value)}
-          className="w-full border p-2 rounded"
+          className="w-full border border-zinc-300 dark:border-zinc-600 p-2 rounded bg-white dark:bg-zinc-900 dark:text-white placeholder:text-zinc-500 dark:placeholder:text-zinc-400"
           required
         />
         <input
@@ -117,7 +117,7 @@ export default function SignUpPage() {
           placeholder="Email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="w-full border p-2 rounded"
+          className="w-full border border-zinc-300 dark:border-zinc-600 p-2 rounded bg-white dark:bg-zinc-900 dark:text-white placeholder:text-zinc-500 dark:placeholder:text-zinc-400"
           required
         />
         <input
@@ -125,15 +125,15 @@ export default function SignUpPage() {
           placeholder="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="w-full border p-2 rounded"
+          className="w-full border border-zinc-300 dark:border-zinc-600 p-2 rounded bg-white dark:bg-zinc-900 dark:text-white placeholder:text-zinc-500 dark:placeholder:text-zinc-400"
           required
         />
-        <button disabled={loading} className="w-full bg-black text-white py-2 rounded">
+        <button disabled={loading} className="w-full bg-black dark:bg-white text-white dark:text-black py-2 rounded hover:opacity-80 transition-opacity disabled:opacity-40">
           {loading ? 'Creating…' : 'Create account'}
         </button>
-        <p className="text-sm">
+        <p className="text-sm text-zinc-600 dark:text-zinc-400">
           Already have an account?{' '}
-          <Link href="/auth/sign-in" className="underline">
+          <Link href="/auth/sign-in" className="underline hover:text-blue-600 dark:hover:text-blue-400">
             Sign in
           </Link>
         </p>

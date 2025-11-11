@@ -55,17 +55,17 @@ export default function SignInPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6">
-      <form onSubmit={onSubmit} className="w-full max-w-sm space-y-4">
-        <h1 className="text-2xl font-semibold">Sign in</h1>
-        {error && <p className="text-red-600 text-sm">{error}</p>}
+    <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-[hsl(var(--background))]">
+      <form onSubmit={onSubmit} className="w-full max-w-sm space-y-4 border border-zinc-300 dark:border-zinc-700 rounded-lg p-6 bg-white dark:bg-zinc-800 shadow-sm">
+        <h1 className="text-2xl font-semibold text-zinc-900 dark:text-white">Sign in</h1>
+        {error && <p className="text-red-600 dark:text-red-400 text-sm">{error}</p>}
         {needsVerification && (
-          <div className="border rounded p-3 bg-yellow-50 text-yellow-800 text-sm space-y-2">
+          <div className="border border-yellow-300 dark:border-yellow-700 rounded p-3 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-300 text-sm space-y-2">
             <p>Your email has not been verified yet.</p>
             <button
               type="button"
               onClick={resendVerification}
-              className="underline text-yellow-900 font-medium"
+              className="underline text-yellow-900 dark:text-yellow-200 font-medium hover:opacity-80"
               disabled={loading}
             >
               Resend verification email
@@ -77,7 +77,7 @@ export default function SignInPage() {
           placeholder="Email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="w-full border p-2 rounded"
+          className="w-full border border-zinc-300 dark:border-zinc-600 p-2 rounded bg-white dark:bg-zinc-900 dark:text-white placeholder:text-zinc-500 dark:placeholder:text-zinc-400"
           required
         />
         <input
@@ -85,15 +85,15 @@ export default function SignInPage() {
           placeholder="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="w-full border p-2 rounded"
+          className="w-full border border-zinc-300 dark:border-zinc-600 p-2 rounded bg-white dark:bg-zinc-900 dark:text-white placeholder:text-zinc-500 dark:placeholder:text-zinc-400"
           required
         />
-        <button disabled={loading} className="w-full bg-black text-white py-2 rounded">
+        <button disabled={loading} className="w-full bg-black dark:bg-white text-white dark:text-black py-2 rounded hover:opacity-80 transition-opacity disabled:opacity-40">
           {loading ? 'Signing in…' : 'Sign in'}
         </button>
-        <p className="text-sm">
+        <p className="text-sm text-zinc-600 dark:text-zinc-400">
           No account?{' '}
-          <Link href="/auth/sign-up" className="underline">
+          <Link href="/auth/sign-up" className="underline hover:text-blue-600 dark:hover:text-blue-400">
             Create one
           </Link>
         </p>

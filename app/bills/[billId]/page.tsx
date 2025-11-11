@@ -32,12 +32,15 @@ export default function BillPage() {
   const [savingName, setSavingName] = useState(false);
   const [deleting, setDeleting] = useState(false);
   
-  // Fetch user profiles for all members and item claimers
+  // Fetch user profiles for all members, item claimers, and bill creator
   const allUids = [
     ...members.map((m) => m.uid),
     ...items.map((it) => it.claimedBy).filter(Boolean),
-  ];
+    bill?.createdBy,
+  ].filter(Boolean);
   const userProfiles = useUserProfiles(allUids);
+  
+  const isCreator = user && bill && bill.createdBy === user.uid;
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
@@ -128,10 +131,10 @@ export default function BillPage() {
   };
 
   return (
-    <div className="p-6 space-y-8 max-w-4xl mx-auto">
+    <div className="min-h-screen p-6 space-y-8 max-w-4xl mx-auto bg-[hsl(var(--background))]">
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-semibold">Bill</h1>
+          <h1 className="text-2xl font-semibold text-zinc-900 dark:text-white">Bill</h1>
           {bill && bill.createdBy === user?.uid ? (
             <BillNameEditor
               communityId={communityId}
@@ -140,29 +143,33 @@ export default function BillPage() {
               onSaved={(n) => setBillName(n)}
             />
           ) : (
-            bill?.billName && <div className="text-lg font-medium">{bill.billName}</div>
+            bill?.billName && <div className="text-lg font-medium text-black dark:text-white">{bill.billName}</div>
           )}
         </div>
-        <a className="underline text-sm" href={`/communities/${communityId}`}>Back</a>
+        <div className="flex items-center gap-3">
+          <a className="underline text-sm text-black dark:text-white hover:text-blue-600 dark:hover:text-blue-400" href={`/communities/${communityId}`}>Back</a>
+        </div>
       </div>
 
       {bill && (
-        <div className="border rounded p-3 space-y-2">
-          <div className="text-sm">Bill ID: {bill.id}</div>
-          <div className="text-sm">Created: {new Date(bill.createdAt).toLocaleString()}</div>
+        <div className="border border-zinc-300 dark:border-zinc-700 rounded p-3 space-y-2 bg-zinc-50 dark:bg-zinc-800">
+          <div className="text-sm text-black dark:text-white">Bill ID: {bill.id}</div>
+          <div className="text-sm text-black dark:text-white">Created by: {getDisplayName(bill.createdBy, userProfiles)}</div>
+          <div className="text-sm text-black dark:text-white">Created: {new Date(bill.createdAt).toLocaleString()}</div>
           <div className="flex items-center gap-2">
-            <label className="text-sm">GBP→CNY rate</label>
+            <label className="text-sm text-black dark:text-white">GBP→CNY rate</label>
             <input
               type="number"
               step="0.0001"
-              className="border p-1 rounded w-28"
+              className="border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-900 dark:text-white p-1 rounded w-28 disabled:opacity-50"
               value={exchangeRate || 0}
               onChange={(e) => updateRate(parseFloat(e.target.value) || 0)}
+              disabled={!isCreator}
             />
           </div>
-          {bill.createdBy === user?.uid && (
+          {isCreator && (
             <button
-              className="text-xs text-red-600 underline"
+              className="text-xs text-red-600 dark:text-red-400 underline hover:text-red-700 dark:hover:text-red-500"
               disabled={deleting}
               onClick={async () => {
                 if (!confirm('Delete this bill? This cannot be undone.')) return;
@@ -185,35 +192,54 @@ export default function BillPage() {
       )}
 
       <section className="space-y-2">
-        <h2 className="text-lg font-medium">Participants</h2>
-        <ul className="flex flex-wrap gap-2">
-          {members.map((m) => (
-            <li key={m.uid}>
-              <label className="flex items-center gap-2 text-sm border p-2 rounded cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={participantIds.includes(m.uid)}
-                  onChange={() => toggleParticipant(m.uid)}
-                />
-                <span>{getDisplayName(m.uid, userProfiles)}</span>
-              </label>
-            </li>
-          ))}
-        </ul>
+        <h2 className="text-lg font-medium text-black dark:text-white">Participants</h2>
+        {isCreator ? (
+          <ul className="flex flex-wrap gap-2">
+            {members.map((m) => (
+              <li key={m.uid}>
+                <label className="flex items-center gap-2 text-sm text-black dark:text-white border border-zinc-300 dark:border-zinc-700 p-2 rounded cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800">
+                  <input
+                    type="checkbox"
+                    checked={participantIds.includes(m.uid)}
+                    onChange={() => toggleParticipant(m.uid)}
+                  />
+                  <span>{getDisplayName(m.uid, userProfiles)}</span>
+                </label>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <ul className="flex flex-wrap gap-2">
+            {participantIds.map((uid) => (
+              <li key={uid} className="text-sm text-black dark:text-white border border-zinc-300 dark:border-zinc-700 p-2 rounded bg-zinc-50 dark:bg-zinc-800">
+                {getDisplayName(uid, userProfiles)}
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       <section className="space-y-2">
-        <h2 className="text-lg font-medium">Items</h2>
-        {err && <p className="text-red-600 text-sm">{err}</p>}
+        <h2 className="text-lg font-medium text-black dark:text-white">Items</h2>
+        {err && <p className="text-red-600 dark:text-red-400 text-sm">{err}</p>}
         <ul className="space-y-2">
           {items.map((it) => (
-            <li key={it.id} className="border rounded p-2 flex justify-between items-center">
-              <div>
-                <div className="font-medium text-sm">{it.name}</div>
-                <div className="text-xs text-zinc-600">{gbp.format(it.price)}</div>
+            <li key={it.id} className="border border-zinc-300 dark:border-zinc-700 rounded p-2 flex justify-between items-center gap-3 bg-white dark:bg-zinc-800">
+              <div className="flex-1">
+                <div className="font-medium text-sm text-black dark:text-white">{it.name}</div>
+                {isCreator ? (
+                  <ItemPriceEditor
+                    communityId={communityId}
+                    billId={billId}
+                    itemId={it.id}
+                    currentPrice={it.price}
+                  />
+                ) : (
+                  <div className="text-xs text-zinc-600 dark:text-zinc-400">{gbp.format(it.price)}</div>
+                )}
               </div>
               <button
-                className={`px-3 py-1 rounded text-sm ${it.claimedBy ? 'bg-zinc-200' : 'bg-black text-white'}`}
+                className={`px-3 py-1 rounded text-sm ${it.claimedBy ? 'bg-zinc-200 dark:bg-zinc-700 text-black dark:text-white' : 'bg-black dark:bg-white text-white dark:text-black'} hover:opacity-80`}
                 onClick={() => toggleClaim(it.id)}
               >
                 {it.claimedBy ? `${getDisplayName(it.claimedBy, userProfiles)}` : 'Claim private'}
@@ -224,20 +250,76 @@ export default function BillPage() {
       </section>
 
       <section className="space-y-2">
-        <h2 className="text-lg font-medium">Totals</h2>
-        <div className="text-sm text-zinc-600">Shared subtotal: {formatBoth((totals.sharedTotal || 0), exchangeRate)}</div>
+        <h2 className="text-lg font-medium text-black dark:text-white">Totals</h2>
+        <div className="text-sm text-zinc-600 dark:text-zinc-400">Shared subtotal: {formatBoth((totals.sharedTotal || 0), exchangeRate)}</div>
         <ul className="space-y-2">
           {totals.result.map((row) => (
-            <li key={row.uid} className="border rounded p-2 flex justify-between items-center">
+            <li key={row.uid} className="border border-zinc-300 dark:border-zinc-700 rounded p-2 flex justify-between items-center bg-zinc-50 dark:bg-zinc-800">
               <div>
-                <div className="font-medium text-sm">{getDisplayName(row.uid, userProfiles)}</div>
-                <div className="text-xs text-zinc-600">Private: {formatBoth(row.private, exchangeRate)} · Share: {formatBoth(row.share, exchangeRate)}</div>
+                <div className="font-medium text-sm text-black dark:text-white">{getDisplayName(row.uid, userProfiles)}</div>
+                <div className="text-xs text-zinc-600 dark:text-zinc-400">Private: {formatBoth(row.private, exchangeRate)} · Share: {formatBoth(row.share, exchangeRate)}</div>
               </div>
-              <div className="text-sm font-medium">{formatBoth(row.total, exchangeRate)}</div>
+              <div className="text-sm font-medium text-black dark:text-white">{formatBoth(row.total, exchangeRate)}</div>
             </li>
           ))}
         </ul>
       </section>
+    </div>
+  );
+}
+
+function ItemPriceEditor({ communityId, billId, itemId, currentPrice }: { communityId: string; billId: string; itemId: string; currentPrice: number }) {
+  const [price, setPrice] = useState(currentPrice.toString());
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => setPrice(currentPrice.toString()), [currentPrice]);
+
+  const save = async () => {
+    const newPrice = parseFloat(price);
+    if (isNaN(newPrice) || newPrice === currentPrice) {
+      setEditing(false);
+      return;
+    }
+    setSaving(true);
+    try {
+      const ref = doc(db, 'communities', communityId, 'bills', billId, 'items', itemId);
+      await updateDoc(ref, { price: newPrice });
+      setEditing(false);
+    } catch (e: any) {
+      alert(e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!editing) {
+    return (
+      <div className="text-xs text-zinc-600 dark:text-zinc-400 flex items-center gap-1">
+        <span>{gbp.format(currentPrice)}</span>
+        <button onClick={() => setEditing(true)} className="text-blue-600 dark:text-blue-400 underline hover:no-underline">
+          Edit
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1">
+      <input
+        type="number"
+        step="0.01"
+        value={price}
+        onChange={(e) => setPrice(e.target.value)}
+        className="border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-900 rounded px-1 py-0.5 text-xs w-20"
+        disabled={saving}
+      />
+      <button onClick={save} disabled={saving} className="text-xs text-green-600 dark:text-green-400 underline hover:no-underline">
+        {saving ? 'Saving...' : 'Save'}
+      </button>
+      <button onClick={() => { setEditing(false); setPrice(currentPrice.toString()); }} className="text-xs text-gray-600 dark:text-gray-400 underline hover:no-underline">
+        Cancel
+      </button>
     </div>
   );
 }
@@ -272,18 +354,18 @@ function BillNameEditor({ communityId, billId, currentName, onSaved }: { communi
       <input
         value={name}
         onChange={(e) => setName(e.target.value)}
-        className="border rounded px-2 py-1 text-sm"
+        className="border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-900 rounded px-2 py-1 text-sm"
         placeholder="Bill name"
         maxLength={80}
       />
       <button
         onClick={save}
         disabled={saving || !name.trim() || name.trim() === currentName}
-        className="text-xs px-2 py-1 rounded bg-black text-white disabled:opacity-40"
+        className="text-xs px-2 py-1 rounded bg-black dark:bg-white text-white dark:text-black disabled:opacity-40 hover:opacity-80"
       >
         {saving ? 'Saving…' : 'Save'}
       </button>
-      {msg && <span className="text-xs text-zinc-500">{msg}</span>}
+      {msg && <span className="text-xs text-zinc-500 dark:text-zinc-400">{msg}</span>}
     </div>
   );
 }

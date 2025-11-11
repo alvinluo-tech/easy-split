@@ -109,42 +109,44 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="p-6 max-w-3xl mx-auto space-y-8">
+    <div className="min-h-screen p-6 max-w-3xl mx-auto space-y-8 bg-[hsl(var(--background))]">
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-semibold">Dashboard</h1>
-        <button onClick={logout} className="text-sm underline">Sign out</button>
+        <h1 className="text-2xl font-semibold text-zinc-900 dark:text-white">Dashboard</h1>
+        <div className="flex items-center gap-3">
+          <button onClick={logout} className="text-sm underline text-zinc-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400">Sign out</button>
+        </div>
       </div>
 
       <section className="space-y-3">
-        <h2 className="text-lg font-medium">Your communities</h2>
-        <ul className="space-y-2">
+        <h2 className="text-lg font-medium text-zinc-900 dark:text-white">Your communities</h2>
+        <ul className="space-y-3">
           {memberships.map((m) => (
-            <li key={m.communityId} className="flex justify-between items-center border p-3 rounded">
+            <li key={m.communityId} className="flex justify-between items-center border border-zinc-300 dark:border-zinc-700 p-3 rounded bg-white dark:bg-zinc-800">
               <div>
-                <div className="font-medium">{m.name}</div>
-                <div className="text-xs text-zinc-500">Code: {m.inviteCode}</div>
+                <div className="font-medium text-zinc-900 dark:text-white">{m.name}</div>
+                <div className="text-xs text-zinc-500 dark:text-zinc-400">Code: {m.inviteCode}</div>
               </div>
-              <Link className="underline" href={`/communities/${m.communityId}`}>Open</Link>
+              <Link className="underline text-zinc-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400" href={`/communities/${m.communityId}`}>Open</Link>
             </li>
           ))}
-          {memberships.length === 0 && <li className="text-sm text-zinc-500">No communities yet.</li>}
+          {memberships.length === 0 && <li className="text-sm text-zinc-500 dark:text-zinc-400">No communities yet.</li>}
         </ul>
       </section>
 
       <section className="space-y-2">
-        <h3 className="font-medium">Create community</h3>
+        <h3 className="font-medium text-zinc-900 dark:text-white">Create community</h3>
         <div className="flex gap-2">
-          <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Community name" className="border p-2 rounded flex-1" />
-          <button onClick={createCommunity} className="bg-black text-white px-4 rounded">Create</button>
+          <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Community name" className="border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white p-2 rounded flex-1 placeholder:text-zinc-500 dark:placeholder:text-zinc-400" />
+          <button onClick={createCommunity} className="bg-black dark:bg-white text-white dark:text-black px-4 rounded hover:opacity-80">Create</button>
         </div>
       </section>
 
       <section className="space-y-2">
-        <h3 className="font-medium">Join via invite code</h3>
-        {error && <p className="text-red-600 text-sm">{error}</p>}
+        <h3 className="font-medium text-zinc-900 dark:text-white">Join via invite code</h3>
+        {error && <p className="text-red-600 dark:text-red-400 text-sm">{error}</p>}
         <div className="flex gap-2">
-          <input value={joinCode} onChange={(e) => setJoinCode(e.target.value)} placeholder="6-char code" className="border p-2 rounded flex-1" />
-          <button onClick={joinCommunity} className="bg-black text-white px-4 rounded">Join</button>
+          <input value={joinCode} onChange={(e) => setJoinCode(e.target.value)} placeholder="6-char code" className="border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white p-2 rounded flex-1 placeholder:text-zinc-500 dark:placeholder:text-zinc-400" />
+          <button onClick={joinCommunity} className="bg-black dark:bg-white text-white dark:text-black px-4 rounded hover:opacity-80">Join</button>
         </div>
       </section>
     </div>

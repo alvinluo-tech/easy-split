@@ -151,32 +151,34 @@ export default function CommunityPage() {
   };
 
   return (
-    <div className="p-6 space-y-8 max-w-4xl mx-auto">
+    <div className="min-h-screen p-6 space-y-8 max-w-4xl mx-auto bg-[hsl(var(--background))]">
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-semibold">Community</h1>
-        <a href="/dashboard" className="underline text-sm">Back</a>
+        <h1 className="text-2xl font-semibold text-zinc-900 dark:text-white">Community</h1>
+        <div className="flex items-center gap-3">
+          <a href="/dashboard" className="underline text-sm text-zinc-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400">Back</a>
+        </div>
       </div>
       {community && (
-        <div className="border rounded p-4 space-y-2">
+        <div className="border border-zinc-300 dark:border-zinc-700 rounded p-4 space-y-2 bg-zinc-50 dark:bg-zinc-800">
           <div className="flex items-center gap-2">
             {isOwner ? (
               <CommunityNameEditor communityId={communityId} currentName={community.name} />
             ) : (
-              <div className="font-medium text-lg">{community.name}</div>
+              <div className="font-medium text-lg text-zinc-900 dark:text-white">{community.name}</div>
             )}
           </div>
-          <div className="text-xs text-zinc-600">Invite code: {community.inviteCode}</div>
+          <div className="text-xs text-zinc-600 dark:text-zinc-400">Invite code: {community.inviteCode}</div>
         </div>
       )}
 
       <section className="space-y-3">
         <div className="flex justify-between items-center">
-          <h2 className="text-lg font-medium">Members ({members.length})</h2>
+          <h2 className="text-lg font-medium text-zinc-900 dark:text-white">Members ({members.length})</h2>
           {user && !isOwner && (
             <button
               onClick={() => removeMember(user.uid)}
               disabled={actionLoading === user.uid}
-              className="text-sm text-red-600 hover:text-red-700 underline"
+              className="text-sm text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-500 underline"
             >
               {actionLoading === user.uid ? 'Leaving...' : 'Leave Community'}
             </button>
@@ -184,27 +186,27 @@ export default function CommunityPage() {
         </div>
         <ul className="grid sm:grid-cols-2 gap-2">
           {members.map((m) => (
-            <li key={m.uid} className="border p-3 rounded">
+            <li key={m.uid} className="border border-zinc-300 dark:border-zinc-700 p-3 rounded bg-white dark:bg-zinc-800">
               <div className="flex justify-between items-start">
                 <div className="flex-1">
-                  <div className="font-medium text-sm flex items-center gap-2">
+                  <div className="font-medium text-sm text-zinc-900 dark:text-white flex items-center gap-2">
                     {getDisplayName(m.uid, userProfiles)}
                     {m.uid === community?.ownerId && (
-                      <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-semibold">
+                      <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded font-semibold">
                         👑 Owner
                       </span>
                     )}
                     {m.uid === user?.uid && m.uid !== community?.ownerId && (
-                      <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">You</span>
+                      <span className="text-xs bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 px-2 py-0.5 rounded">You</span>
                     )}
                   </div>
-                  <div className="text-xs text-zinc-500 mt-1">{m.uid}</div>
+                  <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">{m.uid}</div>
                 </div>
                 {isOwner && m.uid !== community?.ownerId && (
                   <button
                     onClick={() => removeMember(m.uid)}
                     disabled={actionLoading === m.uid}
-                    className="text-xs text-red-600 hover:text-red-700 underline ml-2"
+                    className="text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-500 underline ml-2"
                   >
                     {actionLoading === m.uid ? 'Removing...' : 'Remove'}
                   </button>
@@ -216,27 +218,27 @@ export default function CommunityPage() {
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-lg font-medium">Upload receipt</h2>
-        {error && <p className="text-red-600 text-sm">{error}</p>}
-        <input type="file" accept="image/*" onChange={onUploadReceipt} />
-        {loadingUpload && <p className="text-sm">Processing…</p>}
+        <h2 className="text-lg font-medium text-zinc-900 dark:text-white">Upload receipt</h2>
+        {error && <p className="text-red-600 dark:text-red-400 text-sm">{error}</p>}
+        <input type="file" accept="image/*" onChange={onUploadReceipt} className="text-sm text-zinc-900 dark:text-white" />
+        {loadingUpload && <p className="text-sm text-zinc-600 dark:text-zinc-400">Processing…</p>}
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-lg font-medium">Bills</h2>
+        <h2 className="text-lg font-medium text-zinc-900 dark:text-white">Bills</h2>
         <ul className="space-y-3">
           {bills.map((b) => (
-            <li key={b.id} className="border rounded p-3">
+            <li key={b.id} className="border border-zinc-300 dark:border-zinc-700 rounded p-3 bg-white dark:bg-zinc-800">
               <div className="flex justify-between">
                 <div>
-                  <div className="font-medium">{b.billName || `Bill #${b.id.slice(0, 6)}`}</div>
-                  <div className="text-xs text-zinc-500">Total: {b.total.toFixed(2)} GBP</div>
+                  <div className="font-medium text-zinc-900 dark:text-white">{b.billName || `Bill #${b.id.slice(0, 6)}`}</div>
+                  <div className="text-xs text-zinc-500 dark:text-zinc-400">Total: {b.total.toFixed(2)} GBP</div>
                 </div>
-                <a className="underline text-sm" href={`/bills/${b.id}?community=${communityId}`}>Open</a>
+                <a className="underline text-sm text-zinc-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400" href={`/bills/${b.id}?community=${communityId}`}>Open</a>
               </div>
             </li>
           ))}
-          {bills.length === 0 && <li className="text-sm text-zinc-500">No bills yet.</li>}
+          {bills.length === 0 && <li className="text-sm text-zinc-500 dark:text-zinc-400">No bills yet.</li>}
         </ul>
       </section>
     </div>
@@ -271,17 +273,17 @@ function CommunityNameEditor({ communityId, currentName }: { communityId: string
       <input
         value={name}
         onChange={(e) => setName(e.target.value)}
-        className="border rounded px-2 py-1 text-sm"
+        className="border border-zinc-300 dark:border-zinc-600 rounded px-2 py-1 text-sm bg-white dark:bg-zinc-900 dark:text-white"
         maxLength={60}
       />
       <button
         onClick={save}
         disabled={saving || !name.trim() || name.trim() === currentName}
-        className="text-xs px-2 py-1 rounded bg-black text-white disabled:opacity-40"
+        className="text-xs px-2 py-1 rounded bg-black dark:bg-white text-white dark:text-black disabled:opacity-40 hover:opacity-80 transition-opacity"
       >
         {saving ? 'Saving…' : 'Save'}
       </button>
-      {message && <span className="text-xs text-zinc-500">{message}</span>}
+      {message && <span className="text-xs text-zinc-500 dark:text-zinc-400">{message}</span>}
     </div>
   );
 }
