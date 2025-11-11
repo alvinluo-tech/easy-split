@@ -158,10 +158,13 @@ export default function CommunityPage() {
   };
 
   const onUploadReceipt = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !user) return;
-    setError(null);
-    setLoadingUpload(true);
+  const file = e.target.files?.[0];
+  if (!file || !user) return;
+  setError(null);
+  setLoadingUpload(true);
+  // 显示文件名
+  const fileNameSpan = document.getElementById('selected-file-name');
+  if (fileNameSpan) fileNameSpan.textContent = file.name;
     try {
       // Upload to Firebase Storage
       const storagePath = `receipts/${communityId}/${Date.now()}-${file.name}`;
@@ -192,6 +195,9 @@ export default function CommunityPage() {
       setError(err.message);
     } finally {
       setLoadingUpload(false);
+      // 清空文件名显示
+      const fileNameSpan = document.getElementById('selected-file-name');
+      if (fileNameSpan) fileNameSpan.textContent = '';
       e.target.value = '';
     }
   };
@@ -264,10 +270,31 @@ export default function CommunityPage() {
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-lg font-medium text-zinc-900 dark:text-white">Upload receipt</h2>
-        {error && <p className="text-red-600 dark:text-red-400 text-sm">{error}</p>}
-        <input type="file" accept="image/*" onChange={onUploadReceipt} className="text-sm text-zinc-900 dark:text-white" />
-        {loadingUpload && <p className="text-sm text-zinc-600 dark:text-zinc-400">Processing…</p>}
+          <div className="border border-zinc-300 dark:border-zinc-700 rounded-lg p-5 bg-white dark:bg-zinc-800 shadow-sm flex flex-col gap-3 max-w-md">
+            <h2 className="text-lg font-semibold text-zinc-900 dark:text-white flex items-center gap-2">
+              <span className="inline-block w-5 h-5 text-blue-500 dark:text-blue-300">📄</span>
+              Upload Receipt
+            </h2>
+            {error && <p className="text-red-600 dark:text-red-400 text-sm">{error}</p>}
+            <label className="relative inline-block">
+              <input type="file" accept="image/*" onChange={onUploadReceipt} className="hidden" id="receipt-upload" />
+              <span className="px-4 py-2 rounded bg-blue-600 dark:bg-blue-500 text-white font-medium cursor-pointer hover:bg-blue-700 dark:hover:bg-blue-400 transition flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M4 12l4-4m0 0l4 4m-4-4v12" /></svg>
+                Select Image
+              </span>
+            </label>
+            {/* 文件名显示 */}
+            <span id="selected-file-name" className="text-xs text-zinc-600 dark:text-zinc-400"></span>
+            {loadingUpload && (
+              <div className="flex items-center gap-2">
+                <svg className="animate-spin h-5 w-5 text-blue-500" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                </svg>
+                <span className="text-sm text-zinc-600 dark:text-zinc-400">Uploading & OCR…</span>
+              </div>
+            )}
+          </div>
       </section>
 
       <section className="space-y-3">
