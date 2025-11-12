@@ -26,6 +26,12 @@ export default function SignUpPage() {
       return;
     }
     
+    // Validate password length
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters long');
+      return;
+    }
+    
     setLoading(true);
     
     try {
@@ -122,11 +128,12 @@ export default function SignUpPage() {
         />
         <input
           type="password"
-          placeholder="Password"
+          placeholder="Password (at least 6 characters)"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           className="w-full border border-zinc-300 dark:border-zinc-600 p-2 rounded bg-white dark:bg-zinc-900 dark:text-white placeholder:text-zinc-500 dark:placeholder:text-zinc-400"
           required
+          minLength={6}
         />
         <button disabled={loading} className="w-full bg-black dark:bg-white text-white dark:text-black py-2 rounded hover:opacity-80 transition-opacity disabled:opacity-40">
           {loading ? 'Creating…' : 'Create account'}

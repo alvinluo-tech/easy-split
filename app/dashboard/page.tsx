@@ -16,6 +16,7 @@ import {
   where,
 } from 'firebase/firestore';
 import Link from 'next/link';
+import { Button } from '@/components/ui/Button';
 import { useRouter } from 'next/navigation';
 
 function generateInviteCode() {
@@ -162,7 +163,7 @@ export default function DashboardPage() {
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-semibold text-zinc-900 dark:text-white">Dashboard</h1>
         <div className="flex items-center gap-3">
-          <button onClick={logout} className="text-sm underline text-zinc-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400">Sign out</button>
+          <Button onClick={logout} variant="secondary" size="sm">Sign out</Button>
         </div>
       </div>
 
@@ -175,7 +176,7 @@ export default function DashboardPage() {
                 <div className="font-medium text-zinc-900 dark:text-white">{m.name}</div>
                 <div className="text-xs text-zinc-500 dark:text-zinc-400">Code: {m.inviteCode}</div>
               </div>
-              <Link className="underline text-zinc-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400" href={`/communities/${m.communityId}`}>Open</Link>
+              <Button as="a" href={`/communities/${m.communityId}`} variant="primary" size="sm">Open</Button>
             </li>
           ))}
           {memberships.length === 0 && <li className="text-sm text-zinc-500 dark:text-zinc-400">No communities yet.</li>}

@@ -14,6 +14,9 @@ import {
 } from 'firebase/firestore';
 import { ref, uploadBytes } from 'firebase/storage';
 import { useUserProfiles, getDisplayName } from '@/lib/useUserProfiles';
+import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/Badge';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 
 export default function CommunityPage() {
   const { communityId } = useParams() as { communityId: string };
@@ -26,6 +29,9 @@ export default function CommunityPage() {
   const [bills, setBills] = useState<any[]>([]);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [membersInitialized, setMembersInitialized] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmTargetUid, setConfirmTargetUid] = useState<string | null>(null);
+  const [confirmMessage, setConfirmMessage] = useState('');
   
   // Fetch user profiles for all members
   const memberUids = members.map((m) => m.uid);
@@ -123,13 +129,6 @@ export default function CommunityPage() {
       return;
     }
     
-    const displayName = getDisplayName(memberUid, userProfiles);
-    const confirmMsg = memberUid === user.uid 
-      ? `Are you sure you want to leave this community?`
-      : `Are you sure you want to remove ${displayName} from this community?`;
-    
-    if (!confirm(confirmMsg)) return;
-    
     setActionLoading(memberUid);
     setError(null);
     
@@ -162,6 +161,23 @@ export default function CommunityPage() {
     } finally {
       setActionLoading(null);
     }
+  };
+
+  const openConfirmFor = (memberUid: string) => {
+    const displayName = getDisplayName(memberUid, userProfiles);
+    const msg = memberUid === user?.uid
+      ? 'Are you sure you want to leave this community?'
+      : `Are you sure you want to remove ${displayName} from this community?`;
+    setConfirmTargetUid(memberUid);
+    setConfirmMessage(msg);
+    setConfirmOpen(true);
+  };
+
+  const doRemoveMember = async () => {
+    if (!confirmTargetUid) return;
+    await removeMember(confirmTargetUid);
+    setConfirmOpen(false);
+    setConfirmTargetUid(null);
   };
 
   const onUploadReceipt = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -232,7 +248,7 @@ export default function CommunityPage() {
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-semibold text-zinc-900 dark:text-white">Community</h1>
         <div className="flex items-center gap-3">
-          <a href="/dashboard" className="underline text-sm text-zinc-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400">Back</a>
+          <Button as="a" href="/dashboard" variant="secondary" size="sm">Back</Button>
         </div>
       </div>
       {community && (
@@ -252,13 +268,14 @@ export default function CommunityPage() {
         <div className="flex justify-between items-center">
           <h2 className="text-lg font-medium text-zinc-900 dark:text-white">Members ({members.length})</h2>
           {user && !isOwner && (
-            <button
-              onClick={() => removeMember(user.uid)}
+            <Button
+              onClick={() => openConfirmFor(user.uid)}
               disabled={actionLoading === user.uid}
-              className="text-sm text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-500 underline"
+              variant="danger"
+              size="sm"
             >
               {actionLoading === user.uid ? 'Leaving...' : 'Leave Community'}
-            </button>
+            </Button>
           )}
         </div>
         <ul className="grid sm:grid-cols-2 gap-2">
@@ -269,24 +286,24 @@ export default function CommunityPage() {
                   <div className="font-medium text-sm text-zinc-900 dark:text-white flex items-center gap-2">
                     {getDisplayName(m.uid, userProfiles)}
                     {m.uid === community?.ownerId && (
-                      <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded font-semibold">
-                        👑 Owner
-                      </span>
+                      <Badge variant="primary">👑 Owner</Badge>
                     )}
                     {m.uid === user?.uid && m.uid !== community?.ownerId && (
-                      <span className="text-xs bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 px-2 py-0.5 rounded">You</span>
+                      <Badge variant="success">You</Badge>
                     )}
                   </div>
                   <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">{m.uid}</div>
                 </div>
                 {isOwner && m.uid !== community?.ownerId && (
-                  <button
-                    onClick={() => removeMember(m.uid)}
+                  <Button
+                    onClick={() => openConfirmFor(m.uid)}
                     disabled={actionLoading === m.uid}
-                    className="text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-500 underline ml-2"
+                    variant="danger"
+                    size="sm"
+                    className="ml-2"
                   >
                     {actionLoading === m.uid ? 'Removing...' : 'Remove'}
-                  </button>
+                  </Button>
                 )}
               </div>
             </li>
@@ -332,18 +349,34 @@ export default function CommunityPage() {
                   <div className="font-medium text-zinc-900 dark:text-white flex items-center gap-2">
                     <span>{b.billName || `Bill #${(b.id || '').slice(0, 6)}`}</span>
                     {(b.receiptUrl || b.storagePath) && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-600">with receipt</span>
+                      <Badge className="text-[10px] px-1.5 py-0.5">with receipt</Badge>
                     )}
                   </div>
                   <div className="text-xs text-zinc-500 dark:text-zinc-400">Total: {b.total.toFixed(2)} GBP</div>
                 </div>
-                <a className="underline text-sm text-zinc-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400" href={`/bills/${b.id}?community=${communityId}`}>Open</a>
+                <Button
+                  as="a"
+                  href={`/bills/${b.id}?community=${communityId}`}
+                  variant="primary"
+                  size="sm"
+                >
+                  Open
+                </Button>
               </div>
             </li>
           ))}
           {bills.length === 0 && <li className="text-sm text-zinc-500 dark:text-zinc-400">No bills yet.</li>}
         </ul>
       </section>
+      <ConfirmDialog
+        open={confirmOpen}
+        title={isOwner && confirmTargetUid !== user?.uid ? 'Remove Member' : 'Leave Community'}
+        message={confirmMessage}
+        confirmText={isOwner && confirmTargetUid !== user?.uid ? 'Remove' : 'Leave'}
+        cancelText="Cancel"
+        onConfirm={doRemoveMember}
+        onClose={() => { setConfirmOpen(false); setConfirmTargetUid(null); }}
+      />
     </div>
   );
 }
