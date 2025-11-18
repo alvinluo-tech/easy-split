@@ -13,6 +13,7 @@ import {
   runTransaction,
   updateDoc,
   deleteDoc,
+  setDoc,
 } from 'firebase/firestore';
 import { formatBoth, gbp } from '@/lib/format';
 import { ref as storageRef, getDownloadURL } from 'firebase/storage';
@@ -185,6 +186,34 @@ export default function BillPage() {
     }
   };
 
+  const addItem = async (name: string, price: number) => {
+    if (!communityId || !billId) return;
+    try {
+      const itemsCol = collection(db, 'communities', communityId, 'bills', billId, 'items');
+      const newItemRef = doc(itemsCol);
+      await setDoc(newItemRef, {
+        id: newItemRef.id,
+        name: name.trim(),
+        price: price,
+        claimedBy: null,
+      });
+    } catch (e: any) {
+      setErr(e.message);
+      throw e;
+    }
+  };
+
+  const deleteItem = async (itemId: string) => {
+    if (!communityId || !billId) return;
+    try {
+      const itemRef = doc(db, 'communities', communityId, 'bills', billId, 'items', itemId);
+      await deleteDoc(itemRef);
+    } catch (e: any) {
+      setErr(e.message);
+      throw e;
+    }
+  };
+
   return (
     <div className="min-h-screen p-6 space-y-8 max-w-4xl mx-auto bg-[hsl(var(--background))]">
       <div className="flex justify-between items-center">
@@ -276,7 +305,12 @@ export default function BillPage() {
       </section>
 
       <section className="space-y-2">
-        <h2 className="text-lg font-medium text-black dark:text-white">Items</h2>
+        <div className="flex justify-between items-center">
+          <h2 className="text-lg font-medium text-black dark:text-white">Items</h2>
+          {isCreator && (
+            <AddItemButton onAdd={addItem} />
+          )}
+        </div>
         {err && <p className="text-red-600 dark:text-red-400 text-sm">{err}</p>}
         <ul className="space-y-2">
           {items.map((it) => (
@@ -294,19 +328,30 @@ export default function BillPage() {
                   <div className="text-xs text-zinc-600 dark:text-zinc-400">{gbp.format(it.price)}</div>
                 )}
               </div>
-              {isParticipant ? (
-                <Button
-                  onClick={() => toggleClaim(it.id)}
-                  variant={it.claimedBy ? 'ghost' : 'primary'}
-                  size="sm"
-                >
-                  {it.claimedBy ? `${getDisplayName(it.claimedBy, userProfiles)}` : 'Claim private'}
-                </Button>
-              ) : (
-                <div className="px-3 py-1 text-sm text-zinc-500 dark:text-zinc-400">
-                  {it.claimedBy ? `${getDisplayName(it.claimedBy, userProfiles)}` : 'Shared'}
-                </div>
-              )}
+              <div className="flex items-center gap-2">
+                {isParticipant ? (
+                  <Button
+                    onClick={() => toggleClaim(it.id)}
+                    variant={it.claimedBy ? 'ghost' : 'primary'}
+                    size="sm"
+                  >
+                    {it.claimedBy ? `${getDisplayName(it.claimedBy, userProfiles)}` : 'Claim private'}
+                  </Button>
+                ) : (
+                  <div className="px-3 py-1 text-sm text-zinc-500 dark:text-zinc-400">
+                    {it.claimedBy ? `${getDisplayName(it.claimedBy, userProfiles)}` : 'Shared'}
+                  </div>
+                )}
+                {isCreator && (
+                  <Button
+                    onClick={() => deleteItem(it.id)}
+                    variant="danger"
+                    size="sm"
+                  >
+                    Delete
+                  </Button>
+                )}
+              </div>
             </li>
           ))}
         </ul>
@@ -434,6 +479,71 @@ function BillNameEditor({ communityId, billId, currentName, onSaved }: { communi
         {saving ? 'Saving…' : 'Save'}
       </button>
       {msg && <span className="text-xs text-zinc-500 dark:text-zinc-400">{msg}</span>}
+    </div>
+  );
+}
+
+function AddItemButton({ onAdd }: { onAdd: (name: string, price: number) => Promise<void> }) {
+  const [isAdding, setIsAdding] = useState(false);
+  const [name, setName] = useState('');
+  const [price, setPrice] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const handleAdd = async () => {
+    const itemName = name.trim();
+    const itemPrice = parseFloat(price);
+    
+    if (!itemName || isNaN(itemPrice) || itemPrice < 0) {
+      alert('Please enter a valid name and price');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await onAdd(itemName, itemPrice);
+      setName('');
+      setPrice('');
+      setIsAdding(false);
+    } catch (e) {
+      // Error already handled in parent
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!isAdding) {
+    return (
+      <Button onClick={() => setIsAdding(true)} size="sm" variant="primary">
+        Add Item
+      </Button>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2 p-2 border border-zinc-300 dark:border-zinc-700 rounded bg-white dark:bg-zinc-800">
+      <input
+        type="text"
+        placeholder="Item name"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        className="border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-900 dark:text-white rounded px-2 py-1 text-sm flex-1"
+        disabled={saving}
+      />
+      <input
+        type="number"
+        placeholder="Price"
+        step="0.01"
+        value={price}
+        onChange={(e) => setPrice(e.target.value)}
+        className="border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-900 dark:text-white rounded px-2 py-1 text-sm w-24"
+        disabled={saving}
+      />
+      <Button onClick={handleAdd} disabled={saving} size="sm" variant="primary">
+        {saving ? 'Adding...' : 'Save'}
+      </Button>
+      <Button onClick={() => { setIsAdding(false); setName(''); setPrice(''); }} size="sm" variant="ghost" disabled={saving}>
+        Cancel
+      </Button>
     </div>
   );
 }
